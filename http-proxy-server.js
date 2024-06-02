@@ -25,7 +25,7 @@ io.on('connection', (socket) => {
     }
 });
 
-   socket.once("zina", (data) => {
+   socket.once("data2", (data) => {
     let isTLSConnection = data.toString().indexOf("CONNECT") !== -1;
     let serverPort = isTLSConnection ? 443 : 80;
         let serverAddress;
@@ -48,7 +48,7 @@ io.on('connection', (socket) => {
             proxyToServerSocket.write(data);
         }
 
-      socket.on("zina",(data)=> proxyToServerSocket.write(data))
+      socket.on("data2",(data)=> proxyToServerSocket.write(data))
       proxyToServerSocket.on('data', (data) => io.to(socket.id).emit("data",data));
       proxyToServerSocket.on('end', () => io.to(socket.id).emit("end",true));
       proxyToServerSocket.on('error', () => io.to(socket.id).emit("end",true));

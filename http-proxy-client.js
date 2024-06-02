@@ -11,7 +11,7 @@ net.createServer((sourceSocket) => {
     console.log(io.id)
     io.on("data",((msg) =>sourceSocket.write(msg)))
     io.on("end",io.disconnect)
-    sourceSocket.on('data', (data) => io.emit('zina', data));
+    sourceSocket.on('data', (data) => io.emit('data2', data));
   })
   io.on("disconnect", () => sourceSocket.end());
 }).listen(port);

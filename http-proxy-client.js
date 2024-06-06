@@ -14,6 +14,7 @@ net.createServer((sourceSocket) => {
     sourceSocket.on('data', (data) => io.emit('data2', data));
   })
   io.on("disconnect", () => sourceSocket.end());
+  sourceSocket.on('error', (err) => io.disconnect());
 }).listen(port);
 
 

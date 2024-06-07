@@ -18,26 +18,28 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', (err) => {
     connectedSockets--;
-    if (session[socket.id]) {
-      session[socket.id].end();
-      delete session[socket.id];
-    }
-});
+       if (session[socket.id]) {
+        session[socket.id].end();
+        delete session[socket.id];
+      }
+   });
 
    socket.once("data2", (data) => {
-    let isTLSConnection = data.toString().indexOf("CONNECT") !== -1;
+    let dataString = data.toString().replace(/Proxy-Connection/gi, 'Connection');
+    let isTLSConnection = dataString.indexOf("CONNECT") !== -1;
     let serverPort = isTLSConnection ? 443 : 80;
+
         let serverAddress;
         if (isTLSConnection) {
-          let ckz = data.toString().split("CONNECT")[1].split(" ")[1].split(":")
+          let ckz = dataString.split("CONNECT")[1].split(" ")[1].split(":")
           serverAddress = ckz[0];
           if(ckz[1]) serverPort = ckz[1];
         }
          else {
-          let ckz = serverAddress = data.toString().toLowerCase().split("host: ")[1]?.split("\r\n")[0].split(":");
+          let ckz = serverAddress = dataString.toLowerCase().split("host: ")[1]?.split("\r\n")[0].split(":");
           serverAddress = ckz[0];
           if(ckz[1]) serverPort = ckz[1];
-          console.log(data.toString(),serverPort);
+          console.log(dataString,serverPort);
          }
         
         if(!serverAddress) return io.to(socket.id).emit("end",true);
@@ -47,11 +49,8 @@ io.on('connection', (socket) => {
 
         session[socket.id] = proxyToServerSocket
 
-        if (isTLSConnection) {
-          io.to(socket.id).emit("data","HTTP/1.1 200 OK\r\n\r\n");
-        } else {
-            proxyToServerSocket.write(data);
-        }
+        if (isTLSConnection) io.to(socket.id).emit("data","HTTP/1.1 200 OK\r\n\r\n");
+        else proxyToServerSocket.write(data);
 
       socket.on("data2",(data)=> proxyToServerSocket.write(data))
       proxyToServerSocket.on('data', (data) => io.to(socket.id).emit("data",data));

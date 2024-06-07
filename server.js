@@ -4,22 +4,22 @@ const server = net.createServer();
 server.on("connection", (clientToProxySocket) => {
     console.log("Client connected to proxy");
     clientToProxySocket.once("data", (data) => {
-        let isTLSConnection = data.toString().indexOf("CONNECT") !== -1;
-
-        let serverPort = 80;
-        let serverAddress;
-        console.log(data.toString());
-        if (isTLSConnection) {
-            serverPort = 443;
-            serverAddress = data
-                .toString()
-                .split("CONNECT")[1]
-                .split(" ")[1]
-                .split(":")[0];
-        } else {
-            serverAddress = data.toString().toLowerCase().split("host: ")[1]
-            if(serverAddress) serverAddress = serverAddress.split("\r\n")[0];
-        }
+        let dataString = data.toString().replace(/Proxy-Connection/gi, 'Connection');
+        let isTLSConnection = dataString.indexOf("CONNECT") !== -1;
+        let serverPort = isTLSConnection ? 443 : 80;
+    
+            let serverAddress;
+            if (isTLSConnection) {
+              let ckz = dataString.split("CONNECT")[1].split(" ")[1].split(":")
+              serverAddress = ckz[0];
+              if(ckz[1]) serverPort = ckz[1];
+            }
+             else {
+              let ckz = serverAddress = dataString.toLowerCase().split("host: ")[1]?.split("\r\n")[0].split(":");
+              serverAddress = ckz[0];
+              if(ckz[1]) serverPort = ckz[1];
+              console.log(dataString,serverPort);
+             }
         console.log(serverAddress);
 
 
@@ -43,26 +43,13 @@ server.on("connection", (clientToProxySocket) => {
         clientToProxySocket.pipe(proxyToServerSocket);
         proxyToServerSocket.pipe(clientToProxySocket);
 
-        proxyToServerSocket.on("error", (err) => {
-            console.log("Proxy to server error");
-            console.log(err);
-        });
-
-        clientToProxySocket.on("error", (err) => {
-            console.log("Client to proxy error");
-            console.log(err)
-        });
+        proxyToServerSocket.on("error", (err) => clientToProxySocket.end());
+        clientToProxySocket.on("error", (err) => proxyToServerSocket.end());
     });
 });
 
-server.on("error", (err) => {
-    console.log("Some internal server error occurred");
-    console.log(err);
-});
-
-server.on("close", () => {
-    console.log("Client disconnected");
-});
+server.on("error", (err) => {});
+server.on("close", () => { console.log("Client disconnected");});
 
 server.listen(
     {
@@ -73,16 +60,3 @@ server.listen(
         console.log("Server listening on 0.0.0.0:8080");
     }
 );
-
-/*
-const puppeteer = require('puppeteer');
-
-(async() => {
-  const browser = await puppeteer.launch({
-    headless:false,
-    args: [ '--proxy-server=127.0.0.1:8080' ]
-  });
-  const page = await browser.newPage();
-  await page.goto('http://ifconfig.me');
-  
-})();*/

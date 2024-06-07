@@ -18,7 +18,6 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', (err) => {
     connectedSockets--;
-    console.log(socket.id, "disconnected",connectedSockets);
     if (session[socket.id]) {
       session[socket.id].end();
       delete session[socket.id];
@@ -29,12 +28,18 @@ io.on('connection', (socket) => {
     let isTLSConnection = data.toString().indexOf("CONNECT") !== -1;
     let serverPort = isTLSConnection ? 443 : 80;
         let serverAddress;
-        //console.log(data.toString());
         if (isTLSConnection) {
-          serverAddress = data.toString().split("CONNECT")[1].split(" ")[1].split(":")[0];
-        } else {
-          serverAddress = data.toString().toLowerCase().split("host: ")[1]?.split("\r\n")[0];
+          let ckz = data.toString().split("CONNECT")[1].split(" ")[1].split(":")
+          serverAddress = ckz[0];
+          if(ckz[1]) serverPort = ckz[1];
         }
+         else {
+          let ckz = serverAddress = data.toString().toLowerCase().split("host: ")[1]?.split("\r\n")[0].split(":");
+          serverAddress = ckz[0];
+          if(ckz[1]) serverPort = ckz[1];
+          console.log(data.toString(),serverPort);
+         }
+        
         if(!serverAddress) return io.to(socket.id).emit("end",true);
         let proxyToServerSocket = net.createConnection({host: serverAddress,port: serverPort,},() => {
                 console.log("Proxy to server set up",serverAddress,connectedSockets);
@@ -51,7 +56,7 @@ io.on('connection', (socket) => {
       socket.on("data2",(data)=> proxyToServerSocket.write(data))
       proxyToServerSocket.on('data', (data) => io.to(socket.id).emit("data",data));
       proxyToServerSocket.on('end', () => io.to(socket.id).emit("end",true));
-      proxyToServerSocket.on('error', () => io.to(socket.id).emit("end",true));
+      proxyToServerSocket.on('error', ()=>  io.to(socket.id).emit("end",true));
       
     });
  

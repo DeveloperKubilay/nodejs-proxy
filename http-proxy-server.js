@@ -50,7 +50,7 @@ io.on('connection', (socket) => {
         session[socket.id] = proxyToServerSocket
 
         if (isTLSConnection) io.to(socket.id).emit("data","HTTP/1.1 200 OK\r\n\r\n");
-        else proxyToServerSocket.write(data);
+        else proxyToServerSocket.write(dataString);
 
       socket.on("data2",(data)=> proxyToServerSocket.write(data))
       proxyToServerSocket.on('data', (data) => io.to(socket.id).emit("data",data));

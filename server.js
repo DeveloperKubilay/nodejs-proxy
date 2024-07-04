@@ -43,8 +43,8 @@ server.on("connection", (clientToProxySocket) => {
         clientToProxySocket.pipe(proxyToServerSocket);
         proxyToServerSocket.pipe(clientToProxySocket);
 
-        proxyToServerSocket.on("error", (err) => clientToProxySocket.end());
-        clientToProxySocket.on("error", (err) => proxyToServerSocket.end());
+        proxyToServerSocket.on("error", (err) => {try{clientToProxySocket.end()}catch{}});
+        clientToProxySocket.on("error", (err) => {try{proxyToServerSocket.end()}catch{}});
     });
 });
 

@@ -48,7 +48,7 @@ const puppeteer = require('puppeteer');
     args: [ '--proxy-server=127.0.0.1:100' ]
   });
   const page = await browser.newPage();
-  await page.goto('http://ifconfig.me');
+  await page.goto('http://ifconfig.me',{timeout:0});
   
 })();
 

@@ -1,3 +1,4 @@
+
 const net = require("net");
 const http = require('http');
 const express = require('express');
@@ -8,6 +9,8 @@ const server = http.createServer(app);
 const io = socketIo(server);
 var session = {}
 let connectedSockets = 0;
+const addtimeoutsystem = 60000
+const log = false
 
 app.get('/', (req, res) => {
   res.send("Welcome to the http proxy server");
@@ -44,7 +47,7 @@ io.on('connection', (socket) => {
         
         if(!serverAddress) return io.to(socket.id).emit("end",true);
         let proxyToServerSocket = net.createConnection({host: serverAddress,port: serverPort,},() => {
-                console.log("Proxy to server set up",serverAddress,connectedSockets);
+                if(log) console.log("Proxy to server set up",serverAddress,connectedSockets);
         });
 
         session[socket.id] = proxyToServerSocket
@@ -52,10 +55,30 @@ io.on('connection', (socket) => {
         if (isTLSConnection) io.to(socket.id).emit("data","HTTP/1.1 200 OK\r\n\r\n");
         else proxyToServerSocket.write(dataString);
 
-      socket.on("data2",(data)=> proxyToServerSocket.write(data))
-      proxyToServerSocket.on('data', (data) => io.to(socket.id).emit("data",data));
-      proxyToServerSocket.on('end', () => io.to(socket.id).emit("end",true));
-      proxyToServerSocket.on('error', ()=>  io.to(socket.id).emit("end",true));
+        if(addtimeoutsystem){
+            var tmout = Date.now()+addtimeoutsystem
+            proxyToServerSocket.on('data', (data) => {
+                tmout= Date.now()+addtimeoutsystem
+                io.to(socket.id).emit("data",data)
+            });
+            socket.on("data2",(data)=>{
+                tmout= Date.now()+addtimeoutsystem
+                proxyToServerSocket.write(data)
+            })
+            setInterval(() => {
+                if(Date.now()>tmout) {
+                    io.to(socket.id).emit("end",true);
+                    if(log) console.log("Timeout:",serverAddress,connectedSockets)
+                }
+            }, 5000);
+        }
+        else {
+            proxyToServerSocket.on('data', (data) => io.to(socket.id).emit("data",data));
+            socket.on("data2",(data)=> proxyToServerSocket.write(data))
+        }
+
+        proxyToServerSocket.on('end', () => io.to(socket.id).emit("end",true));
+        proxyToServerSocket.on('error', ()=>  io.to(socket.id).emit("end",true));
       
     });
  

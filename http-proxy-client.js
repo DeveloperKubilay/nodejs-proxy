@@ -1,5 +1,5 @@
-var port = 100
-var url = "http://localhost"
+const port = 100
+const url = "http://localhost"
 
 const socketio = require('socket.io-client')
 const net = require('net');

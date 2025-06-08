@@ -1,3 +1,5 @@
+const port = process.env.PORT || 8080;
+
 const net = require("net");
 const server = net.createServer();
 
@@ -54,7 +56,7 @@ server.on("close", () => { console.log("Client disconnected");});
 server.listen(
     {
         host: "0.0.0.0",
-        port: process.env.PORT || 8080,
+        port: port,
     },
     () => {
         console.log("Server listening on 0.0.0.0:8080");

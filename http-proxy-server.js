@@ -1,3 +1,7 @@
+const port = process.env.PORT || 80;
+const addtimeoutsystem = 60000
+const log = false
+
 
 const net = require("net");
 const http = require('http');
@@ -9,8 +13,6 @@ const server = http.createServer(app);
 const io = socketIo(server);
 var session = {}
 let connectedSockets = 0;
-const addtimeoutsystem = 60000
-const log = false
 
 app.get('/', (req, res) => {
   res.send("Welcome to the http proxy server");
@@ -84,6 +86,6 @@ io.on('connection', (socket) => {
  
 });
 
-server.listen(process.env.PORT || 80, () => {
+server.listen(port, () => {
   console.log('SERVER STARTED');
 });

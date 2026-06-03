@@ -1,91 +1,119 @@
-const port = process.env.PORT || 80;
-const addtimeoutsystem = 60000
-const log = false
-
-
 const net = require("net");
 const http = require('http');
 const express = require('express');
 const socketIo = require('socket.io');
 
+const PORT = 24101;
+const TIMEOUT_MS = 180000;
+const LOG = false;
+
+const authUsers = [
+    { username: "kullanici1", password: "test" }
+];
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
-var session = {}
-let connectedSockets = 0;
+const sessions = new Map();
 
-app.get('/', (req, res) => {
-  res.send("Welcome to the http proxy server");
+const parseConnectData = (dataString) => {
+    const isTLS = dataString.indexOf("CONNECT") !== -1;
+    let serverAddress, serverPort;
+
+    if (isTLS) {
+        const parts = dataString.split("CONNECT")[1].split(" ")[1].split(":");
+        serverAddress = parts[0];
+        serverPort = parts[1] || 443;
+    } else {
+        const hostHeader = dataString.toLowerCase().split("host: ")[1]?.split("\r\n")[0];
+        if (!hostHeader) return null;
+        const parts = hostHeader.split(":");
+        serverAddress = parts[0];
+        serverPort = parts[1] || 80;
+    }
+    return { serverAddress, serverPort, isTLS };
+};
+
+const setupProxy = (socket, proxyData) => {
+    const dataString = proxyData.toString().replace(/Proxy-Connection/gi, 'Connection');
+    const parsed = parseConnectData(dataString);
+
+    if (!parsed || !parsed.serverAddress) {
+        socket.emit("end", true);
+        return;
+    }
+
+    const { serverAddress, serverPort, isTLS } = parsed;
+
+    const proxySocket = net.createConnection({
+        host: serverAddress,
+        port: serverPort
+    }, () => {
+        if (LOG) console.log("Proxy setup:", serverAddress);
+    });
+
+    sessions.set(socket.id, { proxySocket, lastActivity: Date.now() });
+
+    if (isTLS) {
+        socket.emit("data", "HTTP/1.1 200 OK\r\n\r\n");
+    } else {
+        proxySocket.write(dataString);
+    }
+
+    proxySocket.on('data', (d) => {
+        updateActivity(socket.id);
+        socket.emit("data", d);
+    });
+
+    socket.on("data2", (d) => {
+        updateActivity(socket.id);
+        proxySocket.write(d);
+    });
+
+    proxySocket.on('end', () => socket.emit("end", true));
+    proxySocket.on('error', () => socket.emit("end", true));
+};
+
+const updateActivity = (socketId) => {
+    const session = sessions.get(socketId);
+    if (session) session.lastActivity = Date.now();
+};
+
+const checkTimeouts = () => {
+    const now = Date.now();
+    for (const [id, session] of sessions.entries()) {
+        if (now - session.lastActivity > TIMEOUT_MS) {
+            io.to(id).emit("end", true);
+            session.proxySocket.end();
+            sessions.delete(id);
+        }
+    }
+};
+
+setInterval(checkTimeouts, 5000);
+
+io.use((socket, next) => {
+    const auth = socket.handshake.auth;
+    if (!auth) return next(new Error("No auth"));
+
+    const valid = authUsers.some(u => u.username === auth.username && u.password === auth.password);
+    if (valid) {
+        next();
+    } else {
+        next(new Error("Authentication failed"));
+    }
 });
 
 io.on('connection', (socket) => {
-  connectedSockets++;
-
-  socket.on('disconnect', (err) => {
-    connectedSockets--;
-       if (session[socket.id]) {
-        session[socket.id].end();
-        delete session[socket.id];
-      }
-   });
-
-   socket.once("data2", (data) => {
-    let dataString = data.toString().replace(/Proxy-Connection/gi, 'Connection');
-    let isTLSConnection = dataString.indexOf("CONNECT") !== -1;
-    let serverPort = isTLSConnection ? 443 : 80;
-
-        let serverAddress;
-        if (isTLSConnection) {
-          let ckz = dataString.split("CONNECT")[1].split(" ")[1].split(":")
-          serverAddress = ckz[0];
-          if(ckz[1]) serverPort = ckz[1];
+    socket.on('disconnect', () => {
+        const session = sessions.get(socket.id);
+        if (session) {
+            session.proxySocket.end();
+            sessions.delete(socket.id);
         }
-         else {
-          let ckz = serverAddress = dataString.toLowerCase().split("host: ")[1]?.split("\r\n")[0].split(":");
-          serverAddress = ckz[0];
-          if(ckz[1]) serverPort = ckz[1];
-          console.log(dataString,serverPort);
-         }
-        
-        if(!serverAddress) return io.to(socket.id).emit("end",true);
-        let proxyToServerSocket = net.createConnection({host: serverAddress,port: serverPort,},() => {
-                if(log) console.log("Proxy to server set up",serverAddress,connectedSockets);
-        });
-
-        session[socket.id] = proxyToServerSocket
-
-        if (isTLSConnection) io.to(socket.id).emit("data","HTTP/1.1 200 OK\r\n\r\n");
-        else proxyToServerSocket.write(dataString);
-
-        if(addtimeoutsystem){
-            var tmout = Date.now()+addtimeoutsystem
-            proxyToServerSocket.on('data', (data) => {
-                tmout= Date.now()+addtimeoutsystem
-                io.to(socket.id).emit("data",data)
-            });
-            socket.on("data2",(data)=>{
-                tmout= Date.now()+addtimeoutsystem
-                proxyToServerSocket.write(data)
-            })
-            setInterval(() => {
-                if(Date.now()>tmout) {
-                    io.to(socket.id).emit("end",true);
-                    if(log) console.log("Timeout:",serverAddress,connectedSockets)
-                }
-            }, 5000);
-        }
-        else {
-            proxyToServerSocket.on('data', (data) => io.to(socket.id).emit("data",data));
-            socket.on("data2",(data)=> proxyToServerSocket.write(data))
-        }
-
-        proxyToServerSocket.on('end', () => io.to(socket.id).emit("end",true));
-        proxyToServerSocket.on('error', ()=>  io.to(socket.id).emit("end",true));
-      
     });
- 
+
+    socket.once("data2", (data) => setupProxy(socket, data));
 });
 
-server.listen(port, () => {
-  console.log('SERVER STARTED');
-});
+server.listen(PORT, () => console.log(`Server on ${PORT}`));

@@ -38,4 +38,10 @@ You can modify port settings by editing the environment variables or port consta
 For examples using Axios and Puppeteer, see the commented code in http-proxy-client.js.
 
 
+
+## ⚠️ Disclaimer & Acceptable Use
+
+- **Purpose:** This project is provided for local development, API testing, debugging network traffic, and learning network protocols.
+- **Responsibility:** The author is not responsible for any misuse, unauthorized network traversal, or actions that violate organizational network policies or local laws. Use responsibly in authorized testing environments only.
+
 ## Made with ❤️ by DeveloperKubilay
